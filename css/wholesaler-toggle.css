@@ -1,0 +1,41 @@
+span.price del {
+    margin-right: 6px;
+}
+
+span.price > span.price {
+    font-size: inherit !important;
+}
+
+.product-type-simple p.price {
+    display: flex;
+    flex-direction: column;
+}
+
+.single-product .summary .price del {
+    font-size: 1em !important;
+    color: #6a6a6a !important;
+    text-decoration: none;
+}
+
+.single-product .summary .price del bdi {
+    text-decoration: line-through;
+}
+
+#gform_fields_2 .gform_show_password {
+    background: none;
+    padding-right: 0;
+}
+
+#gform_fields_2 .ginput_container,
+#gform_fields_2 .gfield {
+    margin-bottom: 0;
+}
+
+.product_list_widget span.price {
+    display: block;
+    line-height: 1.25;
+}
+
+.gform_button.button:hover, form.search:hover button {
+    background: #d31a4e !important;
+}
