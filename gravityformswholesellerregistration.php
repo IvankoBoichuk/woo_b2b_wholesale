@@ -13,59 +13,233 @@ class WOO_Wholeseller {
     const TEXTDOMAIN = "woo-wholeseller";
 
     function __construct() {
-
+        // Shortcode for auth link in footer
         add_shortcode("fa_auth_link", [$this, "auth_link"]);
-        
+
+        // Add new role "Wholesaler"
         add_action("init", [$this, "add_wholesaler_role"]);
-        
+
+        // Enqueue Scripts & Styles
         add_action("admin_enqueue_scripts", [$this, "admin_enqueue_scripts"]);
         add_action("wp_enqueue_scripts", [$this, "wp_enqueue_scripts"]);
+
+        // AJAX Handler for toggle customer/wholesaler roles 
         add_action("wp_ajax_toggle_wholesaler_role_user", [$this, "wp_ajax_toggle_wholesaler_role_user"]);
+
+        // Add new column "Wholesaler" to users table in admin
+        add_filter("manage_users_columns", [$this, "manage_users_columns"]);
+
+        // Add checkbox for toggle customer/wholesaler roles 
+        add_filter("manage_users_custom_column", [$this, "manage_users_custom_column"], 100, 3);
+
         // Add custom wholesale price field to the product edit page
         add_action("woocommerce_product_options_pricing", [$this, "woocommerce_product_options_pricing"]);
+
         // Save the wholesale price field value
         add_action("woocommerce_process_product_meta", [$this, "woocommerce_process_product_meta"]);
+
         // Add wholesale price field to variations
-        add_action("woocommerce_product_after_variable_attributes", [$this, "woocommerce_product_after_variable_attributes"], 10, 3);
+        add_action("woocommerce_product_after_variable_attributes", [$this, "woocommerce_product_after_variable_attributes"], 100, 3);
+
         // Save wholesale price for variations
-        add_action("woocommerce_save_product_variation", [$this, "woocommerce_save_product_variation"], 10, 2);
+        add_action("woocommerce_save_product_variation", [$this, "woocommerce_save_product_variation"], 100, 2);
 
-        // Додаємо нову колонку "Wholesaler" у таблицю користувачів
-        add_filter("manage_users_columns", [$this, "manage_users_columns"]);
-        // Додаємо чекбокс до колонки
-        add_filter("manage_users_custom_column", [$this, "manage_users_custom_column"], 10, 3);
+        // Price changing. Depends from user role
+        // -- Simple product
+        add_filter("woocommerce_product_get_regular_price", [$this, "get_regular_price"], 100, 2 );
+        add_filter("woocommerce_product_get_sale_price", [$this, "get_sale_price"], 100, 2 );
+        add_filter("woocommerce_product_get_price", [$this, "get_price"], 100, 2 );
+        // -- Variable product
+        add_filter("woocommerce_product_variation_get_regular_price", [$this, "get_regular_price"], 100, 2 );
+        add_filter("woocommerce_product_variation_get_sale_price", [$this, "get_sale_price"], 100, 2 );
+        add_filter("woocommerce_product_variation_get_price", [$this, "get_price"], 100, 2 );
+        add_filter("woocommerce_variation_prices", [$this, "variation_prices_array"], 100, 3);
+        
+        // Unset "Downloads" from menu
+        add_filter("woocommerce_account_menu_items", [$this, "unset_downloads"], 100);
 
-        // Simple, grouped and external products
-        add_filter("woocommerce_product_get_price", [$this, "ts_custom_price"], 99, 2 );
-        add_filter("woocommerce_product_get_regular_price", [$this, "ts_custom_price"], 99, 2 );
+        // Get Stock Status. Depends from user role
+        add_filter("woocommerce_product_is_in_stock", [$this, "filter_product_stock_based_on_user_role"], 100, 2);
+        
+        // Change meta-key for display different stock count. Depends from user role
+        add_filter("woocommerce_update_product_stock_query", [$this, "replace_stock_meta"], 100, 1);
 
-        add_filter("woocommerce_product_variation_get_regular_price", [$this, "variation_get_regular_price"], 99, 2 );
-        add_filter("woocommerce_product_variation_get_sale_price", [$this, "variation_get_sale_price"], 99, 2 );
-        add_filter("woocommerce_product_variation_get_price", [$this, "get_variation_price"], 99, 2 );
-        add_filter("woocommerce_get_price_html", [$this, "woocommerce_get_price_html"], 10, 2);
-
-        add_filter("woocommerce_product_is_in_stock", [$this, "filter_product_stock_based_on_user_role"], 10, 2);
-        // add_action("woocommerce_thankyou", [$this, "reduce_wholesale_stock"]);
-        add_filter("woocommerce_update_product_stock_query", [$this, "replace_stock_meta"], 10, 4);
+        // Add "Wholesale stock" field to product edit page
         add_action("woocommerce_product_options_inventory_product_data", [$this, "add_wholesale_stock_field"], 100);
-        add_action("woocommerce_admin_process_product_object", [$this, "save_wholesale_stock_field"], 10, 1);
-        add_action("woocommerce_variation_options_inventory", [$this, "add_variation_wholesale_stock_field"], 10, 3 );
-		add_action("woocommerce_save_product_variation", [$this, "save_variation_wholesale_stock_field"], 10, 2 );
+        add_action("woocommerce_admin_process_product_object", [$this, "save_wholesale_stock_field"], 100, 1);
+        add_action("woocommerce_variation_options_inventory", [$this, "add_variation_wholesale_stock_field"], 100, 3 );
+		add_action("woocommerce_save_product_variation", [$this, "save_variation_wholesale_stock_field"], 100, 2 );
 
-        add_filter("woocommerce_account_menu_items", [$this, "unset_downloads"], 99);
 
+        // Add link with "Wholesale" filter on the products list
         add_action("admin_footer", [$this, "add_wholesale_status_to_orders_page"]);
-        add_filter("woocommerce_product_get_stock_quantity", [$this, "custom_get_stock_quantity"], 10, 2 );
-        add_filter("woocommerce_product_variation_get_stock_quantity", [$this, "custom_get_stock_quantity"], 10, 2 );
-        
-
-        // Фільтруємо замовлення за роллю клієнта
         add_action("pre_get_posts", [$this, "filter_orders_by_wholesaler"]);
+
+        // Add new "Wholesale stock" column
         add_filter("manage_edit-product_columns", [$this, "add_wholesale_stock_column"]);
-        add_action("manage_product_posts_custom_column", [$this, "display_wholesale_stock_column"], 10, 2);
+        add_action("manage_product_posts_custom_column", [$this, "display_wholesale_stock_column"], 100, 2);
         
+        // Get stock quantity. Depends from user role
+        add_filter("woocommerce_product_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
+        add_filter("woocommerce_product_variation_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
+
+
+        // Print Priselist table for admin
+        add_action("woocommerce_after_add_to_cart_form", [$this, "admin_product_price"]);
+        
+        // Clear cache after product's update 
+        add_action('woocommerce_update_product', [$this, "clear_variation_prices_cache"], 100, 1);
     }
-    function replace_stock_meta($sql, $product_id_with_stock, $new_stock, $operation){
+    function clear_variation_prices_cache($product_id) {
+        $transient_key = 'wc_var_prices_' . $product_id . '_w';
+        delete_transient($transient_key);
+    }
+    function variation_prices_array($prices_array, $product, $for_display) {
+        if (!self::is_wholesaler()) {
+            return $prices_array;
+        }
+    
+        // Ключ для кешу
+        $transient_key = 'wc_var_prices_' . $product->get_id() . '_w';
+    
+        // Спроба отримати кешовані дані
+        $cached_prices = get_transient($transient_key);
+    
+        if ($cached_prices !== false) {
+            return $cached_prices;
+        }
+    
+        // Обробка варіацій і визначення цін
+        foreach ($prices_array as $key => &$variations) {
+            foreach ($variations as $variation_id => &$original_price) {
+                $variation = wc_get_product($variation_id);
+                $wholesale_price = $variation->{"get_$key"}();
+                $original_price = $wholesale_price ? $wholesale_price : $original_price;
+            }
+        }
+    
+        // Збереження результату в кеш
+        set_transient($transient_key, $prices_array, DAY_IN_SECONDS * 30);
+        return $prices_array;
+    }
+    function admin_product_price() {
+        global $product;
+        if (!self::is_admin()) {
+            return;
+        }
+        if ($product->is_type("variable")) {
+            $this->print_variable_pricelist($product);
+        } else {
+            $this->print_pricelist($product);
+        }
+    }
+    function print_pricelist (WC_Product $product) {
+        $pricelist = [
+            $product->get_regular_price(), $product->get_sale_price(),
+            $product->get_meta(self::META_NAME_REGULAR_PRICE), $product->get_meta(self::META_NAME_SALE_PRICE)
+        ];
+        $table = [
+            ["", "Regular Price", "Sale Price"],
+            ["User:", $pricelist[0] ? wc_price($pricelist[0]) : "—", $pricelist[1] ? wc_price($pricelist[1]) : "—"],
+            ["Wholesale:", $pricelist[2] ? wc_price($pricelist[2]) : "—", $pricelist[3] ? wc_price($pricelist[3]) : "—"],
+        ];
+        
+        echo "<div style='
+            margin-top: 20px;
+            margin-bottom: 20px;
+        '>
+            <table border='1' style='border-collapse: collapse; width: 100%;'>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Regular Price</th>
+                        <th>Sale Price</th>
+                    </tr>
+                </thead>
+                <tbody>";
+        
+        foreach ($table as $index => $row) {
+            if ($index === 0) continue; // Пропускаємо заголовок, бо він уже доданий у <thead>
+            echo "<tr>";
+            foreach ($row as $cell) {
+                echo "<td style='padding: 8px; text-align: left;'>$cell</td>";
+            }
+            echo "</tr>";
+        }
+        
+        echo "    </tbody>
+            </table>
+        </div>";
+    }
+    function print_variable_pricelist(WC_Product $product) {
+        // Отримуємо усі варіації товару
+        $variations = $product->get_children();
+        $variation_prices = [];
+    
+        foreach ($variations as $variation_id) {
+            $variation = new WC_Product_Variation($variation_id);
+            $attributes = $variation->get_attributes();
+            $attribute_values = [];
+    
+            // Збираємо значення атрибутів для кожної варіації
+            foreach ($attributes as $attribute_name => $attribute_value) {
+                $attribute_values[] = wc_attribute_label($attribute_name) . ": " . $attribute_value;
+            }
+    
+            $regular_price = $variation->get_regular_price();
+            $sale_price = $variation->get_sale_price();
+            $wholesale_price = $variation->get_meta(self::META_NAME_REGULAR_PRICE);
+            $wholesale_sale_price = $variation->get_meta(self::META_NAME_SALE_PRICE);
+            
+            $variation_prices[] = [
+                'attributes' => implode(", ", $attribute_values),
+                'regular_price_user' => $regular_price ? wc_price($regular_price) : '—',
+                'sale_price_user' => $sale_price ? wc_price($sale_price) : '—',
+                'regular_price_wholesale' => $wholesale_price ? wc_price($wholesale_price) : '—',
+                'sale_price_wholesale' => $wholesale_sale_price ? wc_price($wholesale_sale_price) : '—'
+            ];
+        }
+    
+        // Створюємо таблицю
+        echo "<div style='
+            margin-top: 20px;
+            margin-bottom: 20px;
+        '>
+            <table border='1' class='admin-pricelist'>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>User Role</th>
+                        <th>Regular Price</th>
+                        <th>Sale Price</th>
+                    </tr>
+                </thead>
+                <tbody>";
+    
+        // Додаємо варіації
+        foreach ($variation_prices as $index => $variation) {
+            echo "<tr>";
+            echo "<td rowspan='2' style='vertical-align: middle;'>" . $variation['attributes'] . "</td>"; // Назва атрибутів з rowspan="2"
+    
+            // Для користувача
+            echo "<td>User</td>";
+            echo "<td>" . $variation['regular_price_user'] . "</td>";
+            echo "<td>" . $variation['sale_price_user'] . "</td>";
+            echo "</tr>";
+    
+            // Для оптового покупця
+            echo "<tr>";
+            echo "<td>Wholesale</td>";
+            echo "<td>" . $variation['regular_price_wholesale'] . "</td>";
+            echo "<td>" . $variation['sale_price_wholesale'] . "</td>";
+            echo "</tr>";
+        }
+    
+        echo "    </tbody>
+            </table>
+        </div>";
+    }
+    function replace_stock_meta($sql){
         if (self::is_wholesaler()) {
             return str_replace("'_stock'", "'_wholesale_stock'", $sql);
         }
@@ -137,112 +311,14 @@ class WOO_Wholeseller {
         $query = new WP_Query($args);
         return $query->found_posts;
     }
-    function woocommerce_get_price_html($price_html, $product) {
-        // Determine user roles
-        $is_admin = self::is_admin();
-        $is_wholesaler = self::is_wholesaler();
-        
-        if ($is_admin) {
-            return $price_html;
-        }
-        
-        // Handle variable product pricing
-        if (($is_wholesaler || $is_admin) && $product->is_type('variable')) {
-            return $this->handle_variable_product_price_html($price_html, $product, $is_admin);
-        }
-    
-        // Handle simple, grouped, or external products
-        if ($is_wholesaler || $is_admin) {
-            return $this->handle_simple_product_price_html($price_html, $product, $is_admin);
-        }
-    
-        // Default behavior for other roles or unauthenticated users
-        return $price_html;
-    }
-    /**
-     * Handle price HTML for variable products.
-     */
-    private function handle_variable_product_price_html($price_html, $product, $is_admin) {
-        $wholesale_prices = [];
-        $variations = $product->get_children();
-    
-        // Collect wholesale prices from all variations
-        foreach ($variations as $variation_id) {
-            $variation = wc_get_product($variation_id);
-            $wholesale_price = $variation->get_price();
-            if ($wholesale_price !== null) {
-                $wholesale_prices[] = $wholesale_price;
-            }
-        }
-    
-        // Generate price range or single price
-        if (!empty($wholesale_prices)) {
-            $price_html = $this->format_price_range($wholesale_prices);
-        }
-    
-        // Include regular price if admin
-        if ($is_admin) {
-            $price_html = "{$price_html} - Regular</br>";
-            $wholesale_variable_html = self::get_wholesale_variable_html($product->get_id());
-            if ($wholesale_variable_html) {
-                $price_html = $price_html . $wholesale_variable_html . " - Wholesale";
-            }
-        }
-    
-        return $price_html;
-    }
-    
-    /**
-     * Handle price HTML for simple, grouped, or external products.
-     */
-    private function handle_simple_product_price_html($price_html, $product, $is_admin) {
-        $wholesale_html = self::get_wholesale_html($product->get_id());
-    
-        if ($is_admin && $wholesale_html) {
-            $regular_html = self::get_regular_html($product->get_id());
-            $price_html = $regular_html . $wholesale_html;
-        } elseif ($wholesale_html) {
-            $price_html = $wholesale_html;
-        }
-    
-        return $price_html;
-    }
-    
-    /**
-     * Get the wholesale price for a variation.
-     */
-    private function get_wholesale_price_for_variation($variation) {
-        $wholesale_regular_price = get_post_meta($variation->get_id(), self::META_NAME_REGULAR_PRICE, true);
-        if (!empty($wholesale_regular_price)) {
-            return (float)$wholesale_regular_price;
-        }
-        return null;
-    }
-    
-    /**
-     * Format a price range.
-     */
-    private function format_price_range($prices) {
-        $min_price = min($prices);
-        $max_price = max($prices);
-    
-        if ($min_price === $max_price) {
-            return wc_price($min_price);
-        }
-    
-        return sprintf(
-            __('%s – %s', self::TEXTDOMAIN),
-            wc_price($min_price),
-            wc_price($max_price)
-        );
-    }
     function get_wholesale_variable_html ($product_id) {
         $product = wc_get_product($product_id);
         $price_html = "";
         $variations = $product->get_children();
         foreach ($variations as $variation_id) {
-            $wholesale_regular_price = get_post_meta($variation_id, self::META_NAME_REGULAR_PRICE, true);
-            $wholesale_sale_price = get_post_meta($variation_id, self::META_NAME_SALE_PRICE, true);
+            $product = wc_get_product($variation_id);
+            $wholesale_regular_price = $product->get_meta(self::META_NAME_REGULAR_PRICE);
+            $wholesale_sale_price = $product->get_meta(self::META_NAME_SALE_PRICE);
             if ($wholesale_regular_price) {
                 $wholesale_prices[] = (float) $wholesale_regular_price;
             }
@@ -267,65 +343,26 @@ class WOO_Wholeseller {
         }
         return $price_html;
     }
-    function get_regular_html ($product_id) {
-        $wholesale_regular_price = get_post_meta($product_id, "_regular_price", true);
-        $wholesale_sale_price = get_post_meta($product_id, "_sale_price", true);
-        
-        if ($wholesale_regular_price && $wholesale_sale_price) {
-            $price_html = sprintf(
-                __('<span class="price"><del>%s</del><ins>%s</ins> - Regular</span>', self::TEXTDOMAIN),
-                wc_price($wholesale_regular_price),
-                wc_price($wholesale_sale_price)
-            );
-        } else {
-            $price_html = wc_price($wholesale_regular_price);
-        }
-
-        return $price_html;
-    }
-    function get_wholesale_html ($product_id) {
-        $wholesale_regular_price = get_post_meta($product_id, self::META_NAME_REGULAR_PRICE, true);
-        $wholesale_sale_price = get_post_meta($product_id, self::META_NAME_SALE_PRICE, true);
-        
-        $default_price = get_post_meta($product_id, "_price", true);
-
-        if ($wholesale_regular_price && $wholesale_sale_price) {
-            $price_html = sprintf(
-                __('<span class="price"><del>%s</del><ins>%s</ins> - Wholesale</span>', self::TEXTDOMAIN),
-                wc_price($wholesale_regular_price),
-                wc_price($wholesale_sale_price)
-            );
-        } elseif ($wholesale_regular_price) {
-            $price_html = wc_price($wholesale_regular_price);
-        } else {
-            $price_html = wc_price($default_price);
-        }
-
-        return $price_html;
-    }
-    function variation_get_regular_price($price, $variation) {
+    function get_regular_price($price, $product) {
         if (!self::is_wholesaler()) {
             return $price;
         }
-        $variation_id = $variation->variation_id;
-        $wholesale_regular_price = get_post_meta($variation_id, self::META_NAME_REGULAR_PRICE, true);
-        return $wholesale_regular_price;
+        return $product->get_meta(self::META_NAME_REGULAR_PRICE);
     }
-    function variation_get_sale_price($price, $variation) {
+    function get_sale_price($price, $product) {
         if (!self::is_wholesaler()) {
             return $price;
         }
-        $variation_id = $variation->variation_id;
-        $wholesale_sale_price = get_post_meta($variation_id, self::META_NAME_SALE_PRICE, true);
-        return $wholesale_sale_price;
+        return $product->get_meta(self::META_NAME_SALE_PRICE);
     }
-    function get_variation_price( $price, $variation ) {
+    function get_price( $price, $product ) {
         if (!self::is_wholesaler()) {
             return $price;
         }
-        $variation_id = $variation->variation_id;
-        $wholesale_regular_price = get_post_meta($variation_id, self::META_NAME_REGULAR_PRICE, true);
-        $wholesale_sale_price = get_post_meta($variation_id, self::META_NAME_SALE_PRICE, true);
+
+        $wholesale_regular_price = $product->get_meta(self::META_NAME_REGULAR_PRICE);
+        $wholesale_sale_price = $product->get_meta(self::META_NAME_SALE_PRICE);
+
         if ($wholesale_regular_price && $wholesale_sale_price) {
             return min([
                 $wholesale_regular_price,
@@ -359,29 +396,6 @@ class WOO_Wholeseller {
                 'delete_posts' => false, // Заборонити видалення постів
             )
         );
-    }
-    function ts_custom_price( $price, $product ) {
-        // Перевіряємо, чи користувач залогінений і чи має роль 'wholesaler'
-        if (!is_user_logged_in()) {
-            return $price;
-        }
-
-        if (self::is_admin()) {
-            return $price;
-        }
-        
-        if (! self::is_wholesaler()) {
-            return $price;
-        }
-        // Отримуємо оптові ціни
-        $wholesale_regular_price = get_post_meta($product->get_id(), self::META_NAME_REGULAR_PRICE, true);
-        $wholesale_sale_price = get_post_meta($product->get_id(), self::META_NAME_SALE_PRICE, true);
-        // Якщо є ціна розпродажу, використовуємо її, інакше стандартну оптову ціну
-        if (!empty($wholesale_sale_price)) {
-            return (float) $wholesale_sale_price;
-        } elseif (!empty($wholesale_regular_price)) {
-            return (float) $wholesale_regular_price;
-        }
     }
     function manage_users_columns ($columns) {
         $columns['wholesaler_url'] = __('Website', self::TEXTDOMAIN);
@@ -541,25 +555,12 @@ class WOO_Wholeseller {
     }
     public function filter_product_stock_based_on_user_role($is_in_stock, $product) {
         // Отримуємо роль користувача
-        if (self::is_wholesaler()) {
+        $wholesale_stock = $product->get_meta("_wholesale_stock");
+        if (self::is_wholesaler() && $wholesale_stock) {
             // Отримуємо наявність для ролі wholesale
-            $wholesale_stock = get_post_meta($product->get_id(), '_wholesale_stock', true);
-            return ($wholesale_stock > 0);
+            return $wholesale_stock > 0;
         }
         return $is_in_stock;
-    }
-    public function reduce_wholesale_stock($order_id) {
-        $order = wc_get_order($order_id);
-        
-        // Якщо користувач у ролі wholesale
-        if (self::is_wholesaler()) {
-            foreach ($order->get_items() as $item) {
-                $product_id = $item->get_product_id();
-                $wholesale_stock = get_post_meta($product_id, '_wholesale_stock', true);
-                $new_stock = max(0, $wholesale_stock ? $wholesale_stock : 0 - $item->get_quantity());
-                update_post_meta($product_id, '_wholesale_stock', $new_stock);
-            }
-        }
     }
     /**
 	 * ADD variation custom field
@@ -580,7 +581,6 @@ class WOO_Wholeseller {
         ));
 
 	}
-
 	/**
 	* SAVE variation custom field
 	 *
@@ -612,24 +612,28 @@ class WOO_Wholeseller {
     }
     // Відображаємо значення для колонки
     public function display_wholesale_stock_column($column, $post_id) {
-        if ($column === 'wholesale_stock') {
-            $wholesale_stock = get_post_meta($post_id, '_wholesale_stock', true);
-            echo ($wholesale_stock == '' || $wholesale_stock == "0") ? '—' : esc_html($wholesale_stock);
-        }
-        if ($column === 'wholesale_price') {
-            $product = wc_get_product($post_id);
-            if ($product->is_type('variable')) {
-                $price = self::get_wholesale_variable_html($post_id);
-                echo $price == "" ? "—" : $price;
-            } else {
-                echo self::get_simple_product_price($post_id);
-            }
+        $product = wc_get_product($post_id);
+        switch ($column) {
+            case 'wholesale_stock':
+                $wholesale_stock = $product->get_meta('_wholesale_stock');
+                echo ($wholesale_stock == '' || $wholesale_stock == "0") ? '—' : esc_html($wholesale_stock);
+                break;
+
+            case 'wholesale_price':
+                if ($product->is_type('variable')) {
+                    $price = self::get_wholesale_variable_html($post_id);
+                    echo $price == "" ? "—" : $price;
+                } else {
+                    echo self::get_simple_product_price($post_id);
+                }
+                break;
         }
     }
     public static function get_simple_product_price($product_id) {
         $price = '—';
-        $wholesale_regular_price = get_post_meta($product_id, self::META_NAME_REGULAR_PRICE, true);
-        $wholesale_sale_price = get_post_meta($product_id, self::META_NAME_SALE_PRICE, true);
+        $product = wc_get_product($product_id);
+        $wholesale_regular_price = $product->get_meta(self::META_NAME_REGULAR_PRICE);
+        $wholesale_sale_price = $product->get_meta(self::META_NAME_SALE_PRICE);
         
         if ($wholesale_regular_price && $wholesale_sale_price) {
             $price = min([
@@ -643,7 +647,7 @@ class WOO_Wholeseller {
         return $price;
     }
     function custom_get_stock_quantity( $value, $product ) {
-        if (self::is_admin() && $product->get_meta("_wholesale_stock")) {
+        if (self::is_wholesaler() && $product->get_meta("_wholesale_stock")) {
             return $product->get_meta("_wholesale_stock");
         }
         return $value;

@@ -1,24 +1,37 @@
-span.price del {
-    margin-right: 6px;
+#main .single_variation_wrap .price,
+.single-product #main .product-type-simple .price {
+    font-size: 32px;
+    display: flex;
+    flex-direction: column-reverse;
 }
 
-span.price > span.price {
+#main .single_variation_wrap .price del,
+.single-product #main .product-type-simple .price del {
+    opacity: 1;
+    text-decoration: none;
+    font-size: 20px;
+}
+
+#main .single_variation_wrap .price ins:before,
+.single-product #main .product-type-simple .price ins:before {
+    content: "Now: ";
+}
+
+#main .single_variation_wrap .price del:before,
+.single-product #main .product-type-simple .price del:before {
+    content: "Was: ";
+}
+.single_variation_wrap span.price span {
     font-size: inherit !important;
 }
-
-.product-type-simple p.price {
-    display: flex;
-    flex-direction: column;
+.admin-pricelist {
+    border-collapse: collapse;
+    width: 100%;
 }
-
-.single-product .summary .price del {
-    font-size: 1em !important;
-    color: #6a6a6a !important;
-    text-decoration: none;
-}
-
-.single-product .summary .price del bdi {
-    text-decoration: line-through;
+table.admin-pricelist td,
+table.admin-pricelist th {
+    padding: 5px 18px;
+    font-size: 14px;
 }
 
 #gform_fields_2 .gform_show_password {
