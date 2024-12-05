@@ -71,7 +71,7 @@ class WOO_Wholeseller {
 		add_action("woocommerce_save_product_variation", [$this, "save_variation_wholesale_stock_field"], 100, 2 );
 
 
-        // Add link with "Wholesale" filter on the products list
+        // Add link with "Wholesale" filter on the order list
         add_action("admin_footer", [$this, "add_wholesale_status_to_orders_page"]);
         add_action("pre_get_posts", [$this, "filter_orders_by_wholesaler"]);
 
