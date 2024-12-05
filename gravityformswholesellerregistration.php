@@ -55,8 +55,8 @@ class WOO_Wholeseller {
         add_filter("woocommerce_account_menu_items", [$this, "unset_downloads"], 99);
 
         add_action("admin_footer", [$this, "add_wholesale_status_to_orders_page"]);
-        add_filter( "woocommerce_product_get_stock_quantity", [$this, "custom_get_stock_quantity"], 10, 2 );
-        add_filter( "woocommerce_product_variation_get_stock_quantity", [$this, "custom_get_stock_quantity"], 10, 2 );
+        add_filter("woocommerce_product_get_stock_quantity", [$this, "custom_get_stock_quantity"], 10, 2 );
+        add_filter("woocommerce_product_variation_get_stock_quantity", [$this, "custom_get_stock_quantity"], 10, 2 );
         
 
         // Фільтруємо замовлення за роллю клієнта
