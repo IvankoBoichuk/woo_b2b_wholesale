@@ -528,9 +528,9 @@ class WOO_Wholeseller {
     }
     function auth_link () {
         if (is_user_logged_in()) {
-           return "<a href='".wp_logout_url( home_url())."' title='Log out'>Log out</a>";
+           return "<p><a href='".wp_logout_url( home_url())."' title='Log out'>Log out</a></p>";
         }
-        return "<a href='".get_permalink( get_option('woocommerce_myaccount_page_id') )."' title='Log in'>Log in</a>";
+        return "<p><a href='".get_permalink( get_option('woocommerce_myaccount_page_id') )."' title='Log in'>Log in</a></p>";
     }
     // Додаємо поле для "wholesale stock" в адміні панелі продуктів
     public function add_wholesale_stock_field() {
