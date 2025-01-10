@@ -70,7 +70,6 @@ class WOO_Wholeseller {
         add_action("woocommerce_variation_options_inventory", [$this, "add_variation_wholesale_stock_field"], 100, 3 );
 		add_action("woocommerce_save_product_variation", [$this, "save_variation_wholesale_stock_field"], 100, 2 );
 
-
         // Add link with "Wholesale" filter on the order list
         add_action("admin_footer", [$this, "add_wholesale_status_to_orders_page"]);
         add_action("pre_get_posts", [$this, "filter_orders_by_wholesaler"]);
@@ -82,7 +81,6 @@ class WOO_Wholeseller {
         // Get stock quantity. Depends from user role
         add_filter("woocommerce_product_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
         add_filter("woocommerce_product_variation_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
-
 
         // Print Priselist table for admin
         add_action("woocommerce_after_add_to_cart_form", [$this, "admin_product_price"]);
@@ -528,9 +526,9 @@ class WOO_Wholeseller {
     }
     function auth_link () {
         if (is_user_logged_in()) {
-           return "<p><a href='".wp_logout_url( home_url())."' title='Log out'>Log out</a></p>";
+           return "<p class='auth_link'><a href='".wp_logout_url( home_url())."' title='Log out'>Log out</a></p>";
         }
-        return "<p><a href='".get_permalink( get_option('woocommerce_myaccount_page_id') )."' title='Log in'>Log in</a></p>";
+        return "<p class='auth_link'><a href='".get_permalink( get_option('woocommerce_myaccount_page_id') )."' title='Log in'>Log in</a></p>";
     }
     // Додаємо поле для "wholesale stock" в адміні панелі продуктів
     public function add_wholesale_stock_field() {
