@@ -2,7 +2,7 @@
 /**
 Plugin Name: Gravity Forms Wholeseller Add-On
 Version: 1.0.0
-Author: Ivan Boichuk
+Author: Yaroslav
 **/
 
 defined( 'ABSPATH' ) || die();
@@ -57,36 +57,246 @@ class WOO_Wholeseller {
         
         // Unset "Downloads" from menu
         add_filter("woocommerce_account_menu_items", [$this, "unset_downloads"], 100);
-
-        // Get Stock Status. Depends from user role
-        add_filter("woocommerce_product_is_in_stock", [$this, "filter_product_stock_based_on_user_role"], 100, 2);
         
-        // Change meta-key for display different stock count. Depends from user role
-        add_filter("woocommerce_update_product_stock_query", [$this, "replace_stock_meta"], 100, 1);
-
-        // Add "Wholesale stock" field to product edit page
-        add_action("woocommerce_product_options_inventory_product_data", [$this, "add_wholesale_stock_field"], 100);
-        add_action("woocommerce_admin_process_product_object", [$this, "save_wholesale_stock_field"], 100, 1);
-        add_action("woocommerce_variation_options_inventory", [$this, "add_variation_wholesale_stock_field"], 100, 3 );
-		add_action("woocommerce_save_product_variation", [$this, "save_variation_wholesale_stock_field"], 100, 2 );
-
         // Add link with "Wholesale" filter on the order list
         add_action("admin_footer", [$this, "add_wholesale_status_to_orders_page"]);
         add_action("pre_get_posts", [$this, "filter_orders_by_wholesaler"]);
-
-        // Add new "Wholesale stock" column
-        add_filter("manage_edit-product_columns", [$this, "add_wholesale_stock_column"]);
-        add_action("manage_product_posts_custom_column", [$this, "display_wholesale_stock_column"], 100, 2);
-        
-        // Get stock quantity. Depends from user role
-        add_filter("woocommerce_product_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
-        add_filter("woocommerce_product_variation_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
 
         // Print Priselist table for admin
         add_action("woocommerce_after_add_to_cart_form", [$this, "admin_product_price"]);
         
         // Clear cache after product's update 
         add_action('woocommerce_update_product', [$this, "clear_variation_prices_cache"], 100, 1);
+
+        
+        // Додаємо чекбокси на сторінку редагування товару
+        add_action('woocommerce_product_options_general_product_data', [$this, "add_checkboxes_to_product_edit_page"]);
+        // Зберігаємо значення чекбоксів
+        add_action('woocommerce_process_product_meta', [$this, "save_display_product_setting"]);
+        add_action('woocommerce_product_query', [$this, "archive_product_display_manager"]);
+        add_action('template_redirect', [$this, "single_product_display_manager"]);
+
+        add_action('bulk_edit_custom_box', function($column_name, $post_type) {
+            if ($post_type !== 'product') {
+                return;
+            }
+        
+            if ($column_name === 'name') { // "name" відповідає назві колонки, в якій буде відображено форму
+                ?>
+                <fieldset class="inline-edit-col-left">
+                    <div class="inline-edit-col">
+                        <label class="alignleft" style="margin-right: 20px;">
+                            <input type="checkbox" name="_show_for_retail_bulk" value="yes">
+                            <span><?php _e('Show for Retail', self::TEXTDOMAIN); ?></span>
+                        </label>
+                        <label class="alignleft">
+                            <input type="checkbox" name="_show_for_wholesale_bulk" value="yes">
+                            <span><?php _e('Show for Wholesale', self::TEXTDOMAIN); ?></span>
+                        </label>
+                    </div>
+                </fieldset>
+                <?php
+            }
+        }, 10, 2);
+
+        add_action('save_post', function($post_id) {
+            // Перевіряємо, чи це bulk edit запит
+            if (!isset($_REQUEST['bulk_edit']) || empty($_REQUEST['bulk_edit'])) {
+                return;
+            }
+        
+            // Зберігаємо значення для роздрібних користувачів
+            if (isset($_REQUEST['_show_for_retail_bulk'])) {
+                update_post_meta($post_id, '_show_for_retail', 'yes');
+            } else {
+                update_post_meta($post_id, '_show_for_retail', 'no');
+            }
+        
+            // Зберігаємо значення для оптовиків
+            if (isset($_REQUEST['_show_for_wholesale_bulk'])) {
+                update_post_meta($post_id, '_show_for_wholesale', 'yes');
+            } else {
+                update_post_meta($post_id, '_show_for_wholesale', 'no');
+            }
+        });
+
+        // Додаємо колонки в таблицю товарів
+        add_filter('manage_edit-product_columns', function($columns) {
+            $columns['_show_for_retail'] = __('Retail', self::TEXTDOMAIN);
+            $columns['_show_for_wholesale'] = __('Wholesale', self::TEXTDOMAIN);
+            return $columns;
+        });
+
+        // Відображаємо значення в колонках
+        add_action('manage_product_posts_custom_column', function($column, $post_id) {
+            $white_list = [
+                "_show_for_retail",
+                "_show_for_wholesale",
+            ];
+            if (!in_array($column, $white_list)) return;
+
+            echo match (get_post_meta($post_id, $column, true)) {
+                "yes" => __('Yes', self::TEXTDOMAIN),
+                "no" => __('No', self::TEXTDOMAIN),
+                default => "Unset",
+            };
+        }, 10, 2);
+        
+        add_action('restrict_manage_posts', function($post_type) {
+            if ($post_type !== 'product') {
+                return;
+            }
+        
+            // Фільтр для Retail
+            ?>
+            <select name="_show_for_retail_filter">
+                <option value=""><?php _e('Filter by Retail', self::TEXTDOMAIN); ?></option>
+                <option value="yes" <?php selected($_GET['_show_for_retail_filter'] ?? '', 'yes'); ?>>
+                    <?php _e('Yes', self::TEXTDOMAIN); ?>
+                </option>
+                <option value="no" <?php selected($_GET['_show_for_retail_filter'] ?? '', 'no'); ?>>
+                    <?php _e('No', self::TEXTDOMAIN); ?>
+                </option>
+            </select>
+            <?php
+        
+            // Фільтр для Wholesale
+            ?>
+            <select name="_show_for_wholesale_filter">
+                <option value=""><?php _e('Filter by Wholesale', self::TEXTDOMAIN); ?></option>
+                <option value="yes" <?php selected($_GET['_show_for_wholesale_filter'] ?? '', 'yes'); ?>>
+                    <?php _e('Yes', self::TEXTDOMAIN); ?>
+                </option>
+                <option value="no" <?php selected($_GET['_show_for_wholesale_filter'] ?? '', 'no'); ?>>
+                    <?php _e('No', self::TEXTDOMAIN); ?>
+                </option>
+            </select>
+            <?php
+        });
+
+        add_action('pre_get_posts', function($query) {
+            if (!is_admin() || !$query->is_main_query() || $query->get('post_type') !== 'product') {
+                return;
+            }
+        
+            // Фільтрація за Retail
+            if (!empty($_GET['_show_for_retail_filter'])) {
+                $query->set('meta_query', array_merge(
+                    $query->get('meta_query') ?: array(),
+                    array(
+                        array(
+                            'key' => '_show_for_retail',
+                            'value' => sanitize_text_field($_GET['_show_for_retail_filter']),
+                            'compare' => '='
+                        )
+                    )
+                ));
+            }
+        
+            // Фільтрація за Wholesale
+            if (!empty($_GET['_show_for_wholesale_filter'])) {
+                $query->set('meta_query', array_merge(
+                    $query->get('meta_query') ?: array(),
+                    array(
+                        array(
+                            'key' => '_show_for_wholesale',
+                            'value' => sanitize_text_field($_GET['_show_for_wholesale_filter']),
+                            'compare' => '='
+                        )
+                    )
+                ));
+            }
+        });
+
+        add_action('restrict_manage_posts', function($post_type) {
+            if ($post_type === 'product') {
+                echo '<a href="' . esc_url(remove_query_arg(array('_show_for_retail_filter', '_show_for_wholesale_filter'))) . '" class="button">' . __('Clear Filters', self::TEXTDOMAIN) . '</a>';
+            }
+        });
+    }
+    function archive_product_display_manager($query) {
+        if (is_admin() || self::is_admin()) {
+            return;
+        }
+    
+        $meta_query = $query->get('meta_query') ?: [];
+        if (self::is_wholesaler()) {
+            // Якщо користувач - wholesale, показуємо тільки товари для wholesale
+            $meta_query[] = [
+                'key' => '_show_for_wholesale',
+                'value' => 'yes',
+                'compare' => '='
+            ];
+        } else {
+            // Для всіх інших (retail), ховаємо товари для wholesale
+            $meta_query[] = [
+                'key' => '_show_for_retail',
+                'value' => 'yes',
+                'compare' => '='
+            ];
+        }
+        $query->set('meta_query', $meta_query);
+    }
+    function single_product_display_manager() {
+        if (!is_product() || self::is_admin()) {
+            return;
+        }
+    
+        global $post;
+    
+        $show_for_wholesale = get_post_meta($post->ID, '_show_for_wholesale', true);
+        $show_for_retail = get_post_meta($post->ID, '_show_for_retail', true);
+
+        if (self::is_wholesaler()) {
+            // Wholesale користувач може бачити тільки товари, дозволені для wholesale
+            if ($show_for_wholesale === 'no') {
+                wp_redirect(home_url());
+                exit;
+            }
+        } else {
+            // Retail користувач не може бачити товари для wholesale
+            if ($show_for_retail === 'no') {
+                wp_redirect(home_url());
+                exit;
+            }
+        }
+    }
+    function save_display_product_setting($post_id) {
+        $show_for_retail = isset($_POST['_show_for_retail']) ? 'yes' : 'no';
+        $show_for_wholesale = isset($_POST['_show_for_wholesale']) ? 'yes' : 'no';
+
+        update_post_meta($post_id, '_show_for_retail', $show_for_retail);
+        update_post_meta($post_id, '_show_for_wholesale', $show_for_wholesale);
+    }
+    function add_checkboxes_to_product_edit_page() {
+        global $post;
+
+        // Отримуємо значення мета-поля або задаємо "yes" за замовчуванням для retail
+        $show_for_retail = get_post_meta($post->ID, '_show_for_retail', true);
+        $show_for_retail = ($show_for_retail === '') ? 'yes' : $show_for_retail;
+
+        $show_for_wholesale = get_post_meta($post->ID, '_show_for_wholesale', true);
+        $show_for_wholesale = ($show_for_wholesale === '') ? 'no' : $show_for_wholesale;
+
+        echo '<div class="options_group">';
+
+        woocommerce_wp_checkbox(array(
+            'id' => '_show_for_retail',
+            'label' => __('Show for Retail', self::TEXTDOMAIN),
+            'description' => __('Display this product for retail users.', self::TEXTDOMAIN),
+            'desc_tip' => true,
+            'value' => $show_for_retail, // Встановлюємо значення
+        ));
+
+        woocommerce_wp_checkbox(array(
+            'id' => '_show_for_wholesale',
+            'label' => __('Show for Wholesale', self::TEXTDOMAIN),
+            'description' => __('Display this product for wholesale users.', self::TEXTDOMAIN),
+            'desc_tip' => true,
+            'value' => $show_for_wholesale, // Встановлюємо значення
+        ));
+
+        echo '</div>';
     }
     function clear_variation_prices_cache($product_id) {
         $transient_key = 'wc_var_prices_' . $product_id . '_w';
@@ -236,12 +446,6 @@ class WOO_Wholeseller {
         echo "    </tbody>
             </table>
         </div>";
-    }
-    function replace_stock_meta($sql){
-        if (self::is_wholesaler()) {
-            return str_replace("'_stock'", "'_wholesale_stock'", $sql);
-        }
-        return $sql;
     }
     function unset_downloads($items) {
         unset($items['downloads']); // Видаляємо пункт "Downloads"
@@ -530,103 +734,6 @@ class WOO_Wholeseller {
         }
         return "<p class='auth_link'><a href='".get_permalink( get_option('woocommerce_myaccount_page_id') )."' title='Log in'>Log in</a></p>";
     }
-    // Додаємо поле для "wholesale stock" в адміні панелі продуктів
-    public function add_wholesale_stock_field() {
-        global $product_object;
-        echo '<div class="inventory_new_stock_information options_group show_if_simple show_if_variable">';
-        woocommerce_wp_text_input( array(
-            'id' => '_wholesale_stock',
-            'label' => __('Wholesale Stock', self::TEXTDOMAIN),
-            'description' => __('Separate stock for wholesale customers.', self::TEXTDOMAIN),
-            'type' => 'number',
-            'desc_tip' => true,
-            'value' => $product_object->get_meta( '_wholesale_stock' )
-        ));
-        echo '</div>';
-    }
-    // Зберігаємо значення "wholesale stock"
-    public function save_wholesale_stock_field($product) {
-        if( isset( $_POST['_wholesale_stock'] ) ) {
-			$product->update_meta_data( '_wholesale_stock', sanitize_text_field( $_POST['_wholesale_stock'] ) );
-			$product->save_meta_data();
-		}
-    }
-    public function filter_product_stock_based_on_user_role($is_in_stock, $product) {
-        // Отримуємо роль користувача
-        $wholesale_stock = $product->get_meta("_wholesale_stock");
-        if (self::is_wholesaler() && $wholesale_stock) {
-            // Отримуємо наявність для ролі wholesale
-            return $wholesale_stock > 0;
-        }
-        return $is_in_stock;
-    }
-    /**
-	 * ADD variation custom field
-	 *
-	 * @since 1.0.0
-	 */
-	public function add_variation_wholesale_stock_field( $loop, $variation_data, $variation ) {
-
-		$variation_product = wc_get_product( $variation->ID );
-
-        woocommerce_wp_text_input( array(
-            'id' => '_wholesale_stock' . '[' . $loop . ']',
-            'label' => __('Wholesale Stock', self::TEXTDOMAIN),
-            'description' => __('Separate stock for wholesale customers.', self::TEXTDOMAIN),
-            'type' => 'number',
-            'desc_tip' => true,
-            'value'    => $variation_product->get_meta( '_wholesale_stock' )
-        ));
-
-	}
-	/**
-	* SAVE variation custom field
-	 *
-	 * @since 1.0.0
-	 */
-	public function save_variation_wholesale_stock_field( $variation_id, $i  ) {
-
-		if( isset( $_POST['_wholesale_stock'][$i] ) ) {
-			$variation_product = wc_get_product( $variation_id );
-			$variation_product->update_meta_data( '_wholesale_stock', sanitize_text_field( $_POST['_wholesale_stock'][$i] ) );
-			$variation_product->save_meta_data();
-		}
-
-	}
-    // Додаємо колонку "Wholesale Stock" у таблицю товарів
-    public function add_wholesale_stock_column($columns) {
-        // Вставляємо нову колонку після "stock"
-        $new_columns = array();
-        foreach ($columns as $key => $column) {
-            $new_columns[$key] = $column;
-            if ($key === 'is_in_stock') {
-                $new_columns['wholesale_stock'] = __('Wholesale Stock', self::TEXTDOMAIN);
-            }
-            if ($key === 'price') {
-                $new_columns['wholesale_price'] = __('Wholesale Price', self::TEXTDOMAIN);
-            }
-        }
-        return $new_columns;
-    }
-    // Відображаємо значення для колонки
-    public function display_wholesale_stock_column($column, $post_id) {
-        $product = wc_get_product($post_id);
-        switch ($column) {
-            case 'wholesale_stock':
-                $wholesale_stock = $product->get_meta('_wholesale_stock');
-                echo ($wholesale_stock == '' || $wholesale_stock == "0") ? '—' : esc_html($wholesale_stock);
-                break;
-
-            case 'wholesale_price':
-                if ($product->is_type('variable')) {
-                    $price = self::get_wholesale_variable_html($post_id);
-                    echo $price == "" ? "—" : $price;
-                } else {
-                    echo self::get_simple_product_price($post_id);
-                }
-                break;
-        }
-    }
     public static function get_simple_product_price($product_id) {
         $price = '—';
         $product = wc_get_product($product_id);
@@ -643,12 +750,6 @@ class WOO_Wholeseller {
             $price = wc_price($wholesale_regular_price);
         }
         return $price;
-    }
-    function custom_get_stock_quantity( $value, $product ) {
-        if (self::is_wholesaler() && $product->get_meta("_wholesale_stock")) {
-            return $product->get_meta("_wholesale_stock");
-        }
-        return $value;
     }
 }
 new WOO_Wholeseller();
