@@ -52,3 +52,9 @@ table.admin-pricelist th {
 .gform_button.button:hover, form.search:hover button {
     background: #d31a4e !important;
 }
+
+.user-role-wholesaler .payment_method_cheque,
+.user-role-wholesaler .woocommerce-shipping-totals,
+.user-role-wholesaler .wc_payment_methods {
+    display: none;
+}

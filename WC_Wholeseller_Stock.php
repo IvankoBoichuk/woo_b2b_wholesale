@@ -31,6 +31,11 @@ class WC_Wholeseller_Stock {
         add_filter("woocommerce_product_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
         add_filter("woocommerce_product_variation_get_stock_quantity", [$this, "custom_get_stock_quantity"], 100, 2 );
 
+        // Reduce inventory when wholesale order is created
+        add_action('woocommerce_checkout_order_processed', [$this, 'reduce_wholesale_order_inventory'], 10, 3);
+        
+        // Prevent WooCommerce from reducing stock automatically on status changes for wholesale orders
+        add_filter('woocommerce_can_reduce_order_stock', [$this, 'prevent_duplicate_stock_reduction'], 10, 2);
     }
     function print_pricelist (WC_Product $product) {
         $pricelist = [
@@ -320,7 +325,7 @@ class WC_Wholeseller_Stock {
         }
         return $price;
     }
-    function custom_get_stock_quantity( $value, $product ) {
+    public function custom_get_stock_quantity( $value, $product ) {
         if (self::is_wholesaler() && $product->get_meta("_wholesale_stock")) {
             return $product->get_meta("_wholesale_stock");
         }
