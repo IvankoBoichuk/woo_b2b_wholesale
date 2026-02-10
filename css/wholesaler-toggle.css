@@ -1,24 +1,24 @@
-#main .single_variation_wrap .price,
-.single-product #main .product-type-simple .price {
+#main .single_variation_wrap .summary .price,
+.single-product #main .product-type-simple .summary .price {
     font-size: 32px;
     display: flex;
     flex-direction: column-reverse;
 }
 
-#main .single_variation_wrap .price del,
-.single-product #main .product-type-simple .price del {
+#main .single_variation_wrap .summary .price del,
+.single-product #main .product-type-simple .summary .price del {
     opacity: 1;
     text-decoration: none;
     font-size: 20px;
 }
 
-#main .single_variation_wrap .price ins:before,
-.single-product #main .product-type-simple .price ins:before {
+#main .single_variation_wrap .summary .price ins:before,
+.single-product #main .product-type-simple .summary .price ins:before {
     content: "Now: ";
 }
 
-#main .single_variation_wrap .price del:before,
-.single-product #main .product-type-simple .price del:before {
+#main .single_variation_wrap .summary .price del:before,
+.single-product #main .product-type-simple .summary .price del:before {
     content: "Was: ";
 }
 .single_variation_wrap span.price span {
@@ -51,4 +51,10 @@ table.admin-pricelist th {
 
 .gform_button.button:hover, form.search:hover button {
     background: #d31a4e !important;
+}
+
+.user-role-wholesaler .payment_method_cheque,
+.user-role-wholesaler .woocommerce-shipping-totals,
+.user-role-wholesaler .wc_payment_methods {
+    display: none;
 }
