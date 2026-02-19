@@ -1028,6 +1028,29 @@ class WOO_Wholeseller {
     }
     
     /**
+     * Check if a wholesaler user has completed any previous orders
+     */
+    private function has_completed_orders($user_id = null) {
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        if (!$user_id) {
+            return false;
+        }
+        
+        // Check if user has any completed orders
+        $orders = wc_get_orders([
+            'customer_id' => $user_id,
+            'status' => ['completed', 'processing'],
+            'limit' => 1,
+            'return' => 'ids'
+        ]);
+        
+        return !empty($orders);
+    }
+    
+    /**
      * Check minimum order amount for wholesale users
      */
     public function check_minimum_order_amount() {
@@ -1039,11 +1062,18 @@ class WOO_Wholeseller {
             return;
         }
         
-        // Check if bypass is enabled for this user
         $user_id = get_current_user_id();
+        
+        // Check if bypass is enabled for this user
         $bypass_minimum = get_user_meta($user_id, '_bypass_minimum_order', true);
         
         if ($bypass_minimum === 'yes') {
+            return;
+        }
+        
+        // Check if user has completed any previous orders
+        // Minimum order ONLY applies to the first (opening) order
+        if ($this->has_completed_orders($user_id)) {
             return;
         }
         
@@ -1054,7 +1084,7 @@ class WOO_Wholeseller {
             $remaining = $minimum_amount - $cart_total;
             wc_add_notice(
                 sprintf(
-                    __('Minimum order amount for wholesale customers is %s. Please add %s more to your cart to proceed with checkout.', self::TEXTDOMAIN),
+                    __('Minimum opening order amount for new wholesale customers is %s. Please add %s more to your cart to proceed with checkout. (This minimum only applies to your first order)', self::TEXTDOMAIN),
                     wc_price($minimum_amount),
                     wc_price($remaining)
                 ),
@@ -1072,9 +1102,17 @@ class WOO_Wholeseller {
         }
         
         $user_id = get_current_user_id();
+        
+        // Check if bypass is enabled for this user
         $bypass_minimum = get_user_meta($user_id, '_bypass_minimum_order', true);
         
         if ($bypass_minimum === 'yes') {
+            return;
+        }
+        
+        // Check if user has completed any previous orders
+        // Minimum order ONLY applies to the first (opening) order
+        if ($this->has_completed_orders($user_id)) {
             return;
         }
         
